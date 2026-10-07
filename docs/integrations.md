@@ -158,7 +158,50 @@ SMTP_FROM="NexusCRM Support" <support@example.com>
 
 ---
 
-## 5. Unified Activity Timeline Stream
+## 5. MinIO S3 Object Storage Integration
+
+NexusCRM integrates with MinIO for S3-compatible cloud object storage to securely manage attachments, media files, call recordings, and lead documents.
+
+### 5.1 Required Environment Variables
+```bash
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=your_strong_minio_password
+MINIO_BUCKET=crm-files
+```
+
+### 5.2 Implementation Pattern (`src/storage/minio.ts`)
+The integration uses AWS SDK v3 (`@aws-sdk/client-s3`, `@aws-sdk/s3-request-presigner`):
+- **Bucket Auto-Initialization**: Ensures the target bucket (default `crm-files`) exists on microservice startup.
+- **Upload File**: Streams buffers or file payloads with explicit content types and unique UUID object keys.
+- **Get File & Streaming**: Downloads object streams with zero data leakage.
+- **Presigned URLs**: Generates time-limited download URLs (default 1 hour expiry) for secure agent media access.
+- **Health Check**: Ping bucket existence verification integrated into `GET /health`.
+
+---
+
+## 6. EspoCRM REST Client Integration (`src/espocrm/client.ts`)
+
+The Integration API communicates with EspoCRM using dedicated API Key authentication (`X-Api-Key` header) provisioned for the `nexus-integration` API user.
+
+### 6.1 Authentication & Configuration
+```bash
+ESPOCRM_API_URL=http://localhost:8080/api/v1
+ESPOCRM_API_KEY=48df62e9a00799ea4ed5f1d03d774aee
+```
+
+### 6.2 Capabilities
+- **Generic CRUD**: `getEntity<T>()`, `createEntity<T>()`, `updateEntity<T>()`, `deleteEntity()`, `searchEntities<T>()`.
+- **Omnichannel Communication Records**: `createCommunication()` creating normalized communication entities linked to Leads or Contacts.
+- **Contact & Lead Lookup**: `findContactByPhone()`, `findContactByEmail()`, `findLeadByPhone()`, `findLeadByEmail()`.
+- **Stream Activity Posting**: `postTimelineNote()` posts rich message snippets into entity activity streams.
+- **Health Status**: `checkHealth()` executes quick status probe against EspoCRM App Info endpoint.
+
+---
+
+## 7. Unified Activity Timeline Stream
 
 To provide support agents with complete context, conversations from WhatsApp, Twilio SMS, Voice calls, and Emails are indexed into a unified timeline:
 
@@ -176,3 +219,4 @@ To provide support agents with complete context, conversations from WhatsApp, Tw
 ```
 
 Agents can view the entire multi-channel dialogue history in one consolidated chronological thread inside EspoCRM.
+

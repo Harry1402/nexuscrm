@@ -1,5 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { WhatsAppService } from './service';
+import { TimelineService } from '../timeline/service';
+import { env } from '../config/env';
 
 export const whatsappRouter = Router();
 
@@ -26,7 +28,14 @@ whatsappRouter.post('/', async (req: Request, res: Response): Promise<void> => {
     const messages = WhatsAppService.extractMessages(req.body);
     for (const msg of messages) {
       console.log(`[WhatsApp Inbound] From: ${msg.from}, Body: ${msg.text}`);
-      // In Phase 11 & 15, timeline service will record this event in EspoCRM
+      await TimelineService.recordEvent({
+        type: 'WHATSAPP',
+        direction: 'INBOUND',
+        sender: msg.from,
+        recipient: env.WHATSAPP_PHONE_NUMBER_ID || 'system',
+        body: msg.text || `[Media type: ${msg.type}]`,
+        status: 'RECEIVED',
+      });
     }
   } catch (err) {
     console.error('Error handling WhatsApp webhook:', err);

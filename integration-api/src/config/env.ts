@@ -36,9 +36,17 @@ const envSchema = z.object({
 
   // SMTP
   SMTP_HOST: z.string().optional().default(''),
-  SMTP_PORT: z.string().optional().default('587'),
+  SMTP_PORT: z
+    .string()
+    .default('587')
+    .transform((val) => parseInt(val, 10) || 587),
+  SMTP_SECURE: z
+    .string()
+    .default('false')
+    .transform((val) => val === 'true'),
   SMTP_USER: z.string().optional().default(''),
   SMTP_PASSWORD: z.string().optional().default(''),
+  SMTP_FROM: z.string().default('support@nexuscrm.local'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);

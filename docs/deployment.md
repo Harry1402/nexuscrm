@@ -47,11 +47,19 @@ ESPOCRM_DATABASE_NAME=espocrm
 ESPOCRM_DATABASE_USER=espocrm
 ESPOCRM_DATABASE_PASSWORD=GenerateStrongDbPassword32Chars!
 
+# MinIO S3 Object Storage
+MINIO_ENDPOINT=localhost
+MINIO_PORT=9000
+MINIO_USE_SSL=false
+MINIO_ROOT_USER=minioadmin
+MINIO_ROOT_PASSWORD=GenerateStrongMinioPassword32Chars!
+MINIO_BUCKET=crm-files
+
 # EspoCRM Admin Credentials & URLs
 ESPOCRM_ADMIN_USERNAME=admin
 ESPOCRM_ADMIN_PASSWORD=GenerateStrongAdminPassword32Chars!
-ESPOCRM_SITE_URL=https://crm.yourdomain.com
-ESPOCRM_API_URL=http://espocrm/api/v1
+ESPOCRM_SITE_URL=http://localhost:8080
+ESPOCRM_API_URL=http://localhost:8080/api/v1
 ESPOCRM_API_KEY=GenerateSecureRandomEspoApiKey
 
 # Security & Session Authentication
@@ -64,6 +72,8 @@ TWILIO_AUTH_TOKEN=your_twilio_auth_token_here
 TWILIO_PHONE_NUMBER=+1234567890
 WHATSAPP_API_KEY=EAA...your_whatsapp_cloud_token
 WHATSAPP_PHONE_NUMBER_ID=100000000000000
+WHATSAPP_VERIFY_TOKEN=your_secure_random_verification_token
+WHATSAPP_APP_SECRET=your_whatsapp_app_secret
 SMTP_HOST=smtp.mailgun.org
 SMTP_PORT=587
 SMTP_USER=postmaster@yourdomain.com
@@ -74,40 +84,53 @@ SMTP_FROM=support@yourdomain.com
 > [!CAUTION]
 > Never commit `.env` into version control. Ensure it is listed in `.gitignore`.
 
-### Step 3: Launch Containers
+### Step 3: Launch Docker Services
 Start the multi-container stack in detached mode:
 ```bash
 docker compose up -d
 ```
+This boots up four containers:
+1. `nexuscrm_db` (MariaDB 10.11)
+2. `nexuscrm_espocrm` (EspoCRM Web Application on port 8080)
+3. `nexuscrm_daemon` (EspoCRM Background Job Runner)
+4. `nexuscrm_minio` (MinIO Object Storage on ports 9000 & 9001)
 
 ### Step 4: Validate Service Health
-Run the automated healthcheck script:
-```bash
-chmod +x scripts/healthcheck.sh
-./scripts/healthcheck.sh
-```
-Or check container states directly via Docker:
+Run the automated healthcheck script or check container statuses:
 ```bash
 docker compose ps
 ```
-The `nexuscrm_db` container will transition to `(healthy)` via its built-in InnoDB healthcheck before `nexuscrm_espocrm` begins serving web requests.
+The `nexuscrm_db` container transitions to `(healthy)` via its built-in InnoDB healthcheck before `nexuscrm_espocrm` begins serving web requests.
 
-### Step 5: Access the Web Application
+### Step 5: Start Integration API Microservice
+The Integration API service connects EspoCRM, MinIO, WhatsApp, Twilio, and SMTP:
+```bash
+cd integration-api
+npm install
+npm run build
+npm run dev   # Or 'npm start' in production
+```
+Verify the microservice is operational:
+```bash
+curl http://localhost:3000/health
+```
+
+### Step 6: Access Web Applications
 Open your browser and navigate to:
-```
-http://localhost:8080
-```
-Log in using the administrator credentials configured in your `.env` file.
+- **EspoCRM UI**: `http://localhost:8080` (Log in using configured admin credentials)
+- **MinIO Console**: `http://localhost:9001` (Log in with `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD`)
+- **Integration API Health**: `http://localhost:3000/health`
 
 ---
 
 ## 3. Persistent Volume Management & Backup Operations
 
-NexusCRM maintains data durability through four dedicated Docker volumes:
+NexusCRM maintains data durability through five dedicated Docker volumes:
 1. `espocrm_db`: MariaDB transactional tables, schemas, and binary logs.
 2. `espocrm_data`: Uploaded documents, attachments, and application cache.
 3. `espocrm_custom`: Custom PHP backend entities, metadata, and custom routes.
 4. `espocrm_custom_client`: Client-side JavaScript UI components and views.
+5. `minio_data`: MinIO S3 object storage blobs, attachments, and metadata.
 
 ### 3.1 MariaDB Automated Backup
 To create a consistent SQL dump without stopping the database container:
@@ -132,6 +155,15 @@ docker run --rm \
   -v espocrm_custom:/custom:ro \
   -v "$(pwd)/backups":/backup \
   alpine tar -czf /backup/espocrm_files_$(date +%Y%m%d).tar.gz /data /custom
+```
+
+### 3.4 MinIO S3 Object Storage Backup
+Archive S3 object storage attachments and media:
+```bash
+docker run --rm \
+  -v minio_data:/data:ro \
+  -v "$(pwd)/backups":/backup \
+  alpine tar -czf /backup/minio_data_$(date +%Y%m%d).tar.gz /data
 ```
 
 ---

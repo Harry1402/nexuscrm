@@ -35,6 +35,7 @@ flowchart TD
 - **Support & Sales Agent (`agent`)**: Interacts directly with leads and customers. Permitted only to view, edit, and message contacts assigned directly to them or their immediate queue.
 - **Compliance Auditor (`auditor`)**: Read-only oversight across all communications, audit logs, and timeline events for compliance verification. Cannot modify or delete records.
 - **Portal User (`portal_user`)**: Restricted external end-user account limited strictly to their own support tickets and communication threads.
+- **Integration API (`nexus-integration` Service Role)**: Programmatic service account authenticating via `X-Api-Key`. Possesses scoped CRUD permissions for Lead, Contact, Account, Call, Email, Meeting, and Communication entities required for omnichannel ingestion and synchronization, without interactive UI login rights.
 
 ---
 

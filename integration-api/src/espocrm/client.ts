@@ -50,6 +50,20 @@ export async function findLeadByPhone(phone: string) {
   return res.data;
 }
 
+export async function findLeadByEmail(email: string) {
+  const res = await espocrm.get('/Lead', {
+    params: {
+      where: [{ type: 'equals', attribute: 'emailAddress', value: email }],
+    },
+  });
+  return res.data;
+}
+
+export async function getEntityStream(parentType: string, parentId: string) {
+  const res = await espocrm.get(`/${parentType}/${parentId}/stream`);
+  return res.data;
+}
+
 // ─── Record Creation ──────────────────────────────────────────────────────────
 
 export async function createLead(data: Record<string, any>) {

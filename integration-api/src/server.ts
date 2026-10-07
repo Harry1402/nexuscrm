@@ -5,6 +5,9 @@ import { checkStorageHealth } from './storage/minio';
 import { checkEspoHealth } from './espocrm/client';
 import { whatsappRouter } from './whatsapp/routes';
 import { twilioRouter } from './twilio/routes';
+import { timelineRouter } from './timeline/routes';
+import { emailRouter } from './email/routes';
+import { EmailService } from './email/service';
 
 const app = express();
 
@@ -18,6 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 app.get('/health', async (_req: Request, res: Response) => {
   const minioHealthy = await checkStorageHealth();
   const espoHealthy = await checkEspoHealth();
+  const smtpHealthy = env.SMTP_HOST ? await EmailService.checkSmtpHealth() : null;
 
   res.status(200).json({
     status: 'healthy',
@@ -25,6 +29,7 @@ app.get('/health', async (_req: Request, res: Response) => {
     services: {
       espocrm: espoHealthy ? 'up' : 'unreachable',
       minio: minioHealthy ? 'up' : 'down',
+      smtp: env.SMTP_HOST ? (smtpHealthy ? 'up' : 'down') : 'unconfigured',
       twilio: env.TWILIO_ACCOUNT_SID ? 'configured' : 'unconfigured',
       whatsapp: env.WHATSAPP_ACCESS_TOKEN ? 'configured' : 'unconfigured',
     },
@@ -34,6 +39,8 @@ app.get('/health', async (_req: Request, res: Response) => {
 // Omnichannel Webhook & API Routes
 app.use('/api/v1/whatsapp', whatsappRouter);
 app.use('/api/v1/twilio', twilioRouter);
+app.use('/api/v1/timeline', timelineRouter);
+app.use('/api/v1/email', emailRouter);
 
 // Root route
 app.get('/', (_req: Request, res: Response) => {
