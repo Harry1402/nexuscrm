@@ -6,10 +6,10 @@ services:
     restart: unless-stopped
 
     environment:
-      MARIADB_ROOT_PASSWORD: root_password
-      MARIADB_DATABASE: espocrm
-      MARIADB_USER: espocrm
-      MARIADB_PASSWORD: espocrm_password
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-espocrm}
+      MARIADB_USER: ${MARIADB_USER:-espocrm}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD}
 
     volumes:
       - espocrm_db:/var/lib/mysql
@@ -34,16 +34,16 @@ services:
 
     environment:
       ESPOCRM_DATABASE_PLATFORM: Mysql
-      ESPOCRM_DATABASE_HOST: espocrm-db
-      ESPOCRM_DATABASE_PORT: 3306
-      ESPOCRM_DATABASE_NAME: espocrm
-      ESPOCRM_DATABASE_USER: espocrm
-      ESPOCRM_DATABASE_PASSWORD: espocrm_password
+      ESPOCRM_DATABASE_HOST: ${ESPOCRM_DATABASE_HOST:-espocrm-db}
+      ESPOCRM_DATABASE_PORT: ${ESPOCRM_DATABASE_PORT:-3306}
+      ESPOCRM_DATABASE_NAME: ${ESPOCRM_DATABASE_NAME:-espocrm}
+      ESPOCRM_DATABASE_USER: ${ESPOCRM_DATABASE_USER:-espocrm}
+      ESPOCRM_DATABASE_PASSWORD: ${ESPOCRM_DATABASE_PASSWORD}
 
-      ESPOCRM_ADMIN_USERNAME: admin
-      ESPOCRM_ADMIN_PASSWORD: admin
+      ESPOCRM_ADMIN_USERNAME: ${ESPOCRM_ADMIN_USERNAME:-admin}
+      ESPOCRM_ADMIN_PASSWORD: ${ESPOCRM_ADMIN_PASSWORD}
 
-      ESPOCRM_SITE_URL: "http://localhost:8080"
+      ESPOCRM_SITE_URL: ${ESPOCRM_SITE_URL:-http://localhost:8080}
 
     depends_on:
       espocrm-db:
