@@ -87,9 +87,10 @@ nexuscrm/
 ├── docker-compose.yml             # Container orchestration (MariaDB, EspoCRM, MinIO, Daemon)
 ├── docs/                          # In-depth technical documentation
 │   ├── architecture.md            # System topology, sequence flows, network isolation
-│   ├── crm-comparison.md          # Technical analysis of open-source CRM platforms
+│   ├── crm-comparison.md          # 15-dimension open-source CRM benchmark report
 │   ├── deployment.md              # Production deployment, backups, and SSL hardening
 │   ├── integrations.md            # WhatsApp, Twilio, SMTP, and EspoCRM webhooks
+│   ├── presentation.md            # Hackathon pitch deck, 17-step demo script & Q&A defense
 │   └── rbac.md                    # Role hierarchy, permissions matrix, and BOLA defense
 ├── espocrm/
 │   └── custom/                    # Custom EspoCRM backend PHP modules and entities
@@ -107,16 +108,26 @@ nexuscrm/
 │       ├── storage/
 │       │   └── minio.ts           # AWS SDK v3 S3 client for MinIO (upload, download, health)
 │       ├── timeline/
-│       │   └── service.ts         # Unified omnichannel event normalizer
+│       │   ├── routes.ts          # Timeline event API and Customer 360 endpoints
+│       │   └── service.ts         # Unified omnichannel event normalizer and 360 aggregator
+│       ├── health/
+│       │   └── routes.ts          # Granular multi-service health probes (/health, /espocrm, /minio, etc.)
+│       ├── audit/
+│       │   ├── logger.ts          # AuditLogger singleton — ring buffer + append-only logs/audit.log
+│       │   └── routes.ts          # GET /api/v1/audit/log and /audit/stats endpoints
+│       ├── dashboard/
+│       │   └── routes.ts          # Operations Dashboard HTML UI + /status JSON endpoint
 │       ├── twilio/
 │       │   ├── routes.ts          # Twilio SMS/Voice webhook Express routes
 │       │   └── service.ts         # Twilio SDK client for outbound SMS
 │       ├── whatsapp/
 │       │   ├── routes.ts          # WhatsApp hub verification + inbound POST handler
 │       │   └── service.ts         # WhatsApp Cloud API send + payload parser
-│       └── server.ts              # Express app bootstrap, middleware, /health endpoint
+│       └── server.ts              # Express app bootstrap, middleware, and /health routing
 └── scripts/
-    ├── healthcheck.sh             # Bash service health verification script
+    ├── deploy.sh                  # Turnkey one-command deployment orchestrator
+    ├── healthcheck.sh             # Multi-service colored bash health verification script
+    ├── seed.js                    # Idempotent demo data seeder (Accounts, Contacts, Leads)
     ├── seed-roles.js              # EspoCRM 5-tier RBAC role seeding script
     └── seed-api-user.js           # EspoCRM Integration API role & user provisioning script
 ```
@@ -125,23 +136,35 @@ nexuscrm/
 
 ## Quickstart Guide
 
-### 1. Prerequisites
+### Option A: Turnkey One-Command Deployment (Recommended)
+Clone the repository and run the automated deployment script to start containers, wait for health, seed RBAC roles, create the API user, and populate realistic demo data in one command:
+```bash
+git clone https://github.com/Harry1402/nexuscrm.git
+cd nexuscrm
+bash scripts/deploy.sh
+```
+
+---
+
+### Option B: Step-by-Step Manual Deployment
+
+#### 1. Prerequisites
 - [Docker Engine](https://docs.docker.com/engine/install/) 24.0+ and [Docker Compose](https://docs.docker.com/compose/) v2+
 - [Node.js](https://nodejs.org/) 20 LTS+ (required for the Integration API)
 
-### 2. Configure Environment Variables
+#### 2. Configure Environment Variables
 Copy `.env.example` to `.env` and fill in your secrets:
 ```bash
 cp .env.example .env
 ```
 
-### 3. Launch the Full Stack
-Start all containers (MariaDB, EspoCRM, MinIO, Daemon):
+#### 3. Launch the Full Stack
+Start all containers (MariaDB, EspoCRM, MinIO, Daemon, Integration API):
 ```bash
 docker compose up -d
 ```
 
-### 4. Provision EspoCRM Roles & API User
+#### 4. Provision EspoCRM Roles & API User
 Seed the 5-tier RBAC roles:
 ```bash
 node scripts/seed-roles.js
@@ -152,7 +175,14 @@ node scripts/seed-api-user.js
 ```
 Copy the printed `ESPOCRM_API_KEY` value into your `.env` file.
 
-### 5. Start the Integration API
+#### 5. Seed Demo Data
+Populate EspoCRM with realistic demo Accounts, Contacts, and multi-channel Leads:
+```bash
+node scripts/seed.js
+```
+
+#### 6. Start the Integration API (Local Node Development)
+If not running via Docker Compose:
 ```bash
 cd integration-api
 npm install
@@ -162,9 +192,18 @@ npm run build && npm start   # Production
 ```
 
 ### 6. Verify System Health
+Run the automated multi-service health probe:
 ```bash
-docker compose ps
-curl http://localhost:3000/health
+bash scripts/healthcheck.sh
+```
+Or query granular health endpoints directly:
+```bash
+curl http://localhost:3000/health          # Consolidated status
+curl http://localhost:3000/health/espocrm  # EspoCRM API & latency probe
+curl http://localhost:3000/health/minio    # MinIO S3 bucket probe
+curl http://localhost:3000/health/twilio   # Twilio telephony status
+curl http://localhost:3000/health/whatsapp # WhatsApp Cloud API status
+curl http://localhost:3000/health/email    # SMTP transport connectivity
 ```
 
 ### 7. Access NexusCRM
@@ -173,6 +212,7 @@ curl http://localhost:3000/health
 | **EspoCRM Web UI** | http://localhost:8080 | From `.env` admin credentials |
 | **MinIO Console** | http://localhost:9001 | `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` |
 | **Integration API** | http://localhost:3000 | API key via `X-Api-Key` header |
+| **Operations Dashboard** | http://localhost:3000/dashboard | Internal — no auth required |
 
 ---
 
@@ -191,7 +231,7 @@ curl http://localhost:3000/health
 ## Environment Variables Reference
 
 | Variable | Description | Required |
-| :--- | :--- | :---: |
+| :--- | :--- | :--- |
 | `MARIADB_ROOT_PASSWORD` | MariaDB root account password | ✅ |
 | `MARIADB_DATABASE` | Database name (default: `espocrm`) | ✅ |
 | `MARIADB_USER` / `MARIADB_PASSWORD` | Application DB credentials | ✅ |
@@ -208,7 +248,8 @@ curl http://localhost:3000/health
 ## Comprehensive Technical Documentation
 
 - 📐 **[System Architecture](docs/architecture.md)** — Container topology, sequence flows, MinIO storage, and network isolation.
-- ⚖️ **[CRM Platform Comparison](docs/crm-comparison.md)** — Trade-off analysis comparing EspoCRM, SuiteCRM, Odoo, and custom builds.
+- ⚖️ **[CRM Benchmark Report](docs/crm-comparison.md)** — 15-dimension comparative evaluation of EspoCRM, Twenty, Frappe CRM, and SuiteCRM.
+- 🎤 **[Pitch Deck & Live Demo Playbook](docs/presentation.md)** — 10-slide pitch presentation narrative, 17-step rehearsed live demo script, team matrix, and Q&A defense.
 - 🚀 **[Production Deployment Guide](docs/deployment.md)** — Full setup procedure, backup strategies, SSL reverse proxy, and integration API startup.
 - 🔌 **[Third-Party Integrations Guide](docs/integrations.md)** — WhatsApp Cloud API, Twilio SMS/Voice, SMTP, MinIO storage, and EspoCRM webhooks.
 - 🛡️ **[RBAC & BOLA Defense Specification](docs/rbac.md)** — 5-tier role hierarchy, permissions matrix, Integration API role, and object-level authorization patterns.

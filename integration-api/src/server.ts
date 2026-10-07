@@ -1,13 +1,14 @@
 import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import { env } from './config/env';
-import { checkStorageHealth } from './storage/minio';
-import { checkEspoHealth } from './espocrm/client';
+import { healthRouter } from './health/routes';
 import { whatsappRouter } from './whatsapp/routes';
 import { twilioRouter } from './twilio/routes';
 import { timelineRouter } from './timeline/routes';
+import { dashboardRouter } from './dashboard/routes';
 import { emailRouter } from './email/routes';
-import { EmailService } from './email/service';
+import { auditRouter } from './audit/routes';
+import { AuditLogger } from './audit/logger';
 
 const app = express();
 
@@ -17,30 +18,16 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Health Check Endpoint (Phase 21 preliminary support)
-app.get('/health', async (_req: Request, res: Response) => {
-  const minioHealthy = await checkStorageHealth();
-  const espoHealthy = await checkEspoHealth();
-  const smtpHealthy = env.SMTP_HOST ? await EmailService.checkSmtpHealth() : null;
-
-  res.status(200).json({
-    status: 'healthy',
-    timestamp: new Date().toISOString(),
-    services: {
-      espocrm: espoHealthy ? 'up' : 'unreachable',
-      minio: minioHealthy ? 'up' : 'down',
-      smtp: env.SMTP_HOST ? (smtpHealthy ? 'up' : 'down') : 'unconfigured',
-      twilio: env.TWILIO_ACCOUNT_SID ? 'configured' : 'unconfigured',
-      whatsapp: env.WHATSAPP_ACCESS_TOKEN ? 'configured' : 'unconfigured',
-    },
-  });
-});
+// Health Check Routes (Phase 21 Enterprise Multi-Service Probes)
+app.use('/health', healthRouter);
 
 // Omnichannel Webhook & API Routes
 app.use('/api/v1/whatsapp', whatsappRouter);
 app.use('/api/v1/twilio', twilioRouter);
 app.use('/api/v1/timeline', timelineRouter);
 app.use('/api/v1/email', emailRouter);
+app.use('/api/v1/audit', auditRouter);
+app.use('/dashboard', dashboardRouter);
 
 // Root route
 app.get('/', (_req: Request, res: Response) => {
@@ -65,6 +52,7 @@ if (process.env.NODE_ENV !== 'test') {
   app.listen(env.PORT, () => {
     console.log(`🚀 NexusCRM Integration API running on http://localhost:${env.PORT}`);
     console.log(`📁 MinIO Target Bucket: ${env.MINIO_BUCKET}`);
+    AuditLogger.info('SYSTEM', 'HTTP server started', { port: env.PORT, env: env.NODE_ENV });
   });
 }
 

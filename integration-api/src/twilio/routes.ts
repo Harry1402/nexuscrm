@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { TwilioService } from './service';
 import { TimelineService } from '../timeline/service';
 import { env } from '../config/env';
+import { AuditLogger } from '../audit/logger';
 
 export const twilioRouter = Router();
 
@@ -43,11 +44,13 @@ const OutboundSmsSchema = z.object({
 twilioRouter.post('/voice', (req: Request, res: Response): void => {
   if (!TwilioService.validateTwilioWebhook(req)) {
     res.status(403).send('Forbidden: Invalid Twilio Signature');
+    AuditLogger.warn('WEBHOOK', 'Twilio voice webhook rejected — invalid signature');
     return;
   }
 
   const from = req.body.From || 'Unknown';
   console.log(`[Twilio Voice Inbound] Incoming call from: ${from}`);
+  AuditLogger.info('CALL', 'Twilio inbound voice call received', { from });
 
   const twiml = TwilioService.generateInboundTwiml({
     greeting: 'Welcome to NexusCRM. Please leave your message after the tone.',
@@ -160,8 +163,15 @@ twilioRouter.post('/recording', async (req: Request, res: Response): Promise<voi
         status: 'COMPLETED',
         body: `Voicemail recording archived to storage (${duration}s)`,
       });
+
+      AuditLogger.info('CALL', 'Twilio recording archived and CRM event recorded', {
+        callSid: callSid || 'unknown',
+        duration,
+        archived: archiveResult.success,
+      });
     } catch (err: any) {
       console.error('[Twilio Recording Pipeline Error]', err);
+      AuditLogger.error('CALL', 'Twilio recording pipeline failed', { callSid: callSid || 'unknown', error: err?.message || 'unknown' });
     }
   }
 });
@@ -243,6 +253,7 @@ twilioRouter.post('/sms/status', (req: Request, res: Response): void => {
 twilioRouter.post('/sms', async (req: Request, res: Response): Promise<void> => {
   if (!TwilioService.validateTwilioWebhook(req)) {
     res.status(403).send('Forbidden: Invalid Twilio Signature');
+    AuditLogger.warn('WEBHOOK', 'Twilio SMS webhook rejected — invalid signature');
     return;
   }
 
@@ -294,8 +305,13 @@ twilioRouter.post('/sms', async (req: Request, res: Response): Promise<void> => 
         body: body,
         status: 'RECEIVED',
       });
+      AuditLogger.info('WEBHOOK', 'Twilio inbound SMS processed', {
+        from,
+        mediaCount: archivedMediaUrls.length,
+      });
     } catch (err) {
       console.error('[Twilio SMS Timeline Error]', err);
+      AuditLogger.error('WEBHOOK', 'Twilio SMS timeline record failed', { from });
     }
   }
 });

@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import { TimelineService } from './service';
+import { AuditLogger } from '../audit/logger';
 
 export const timelineRouter = Router();
 
@@ -40,10 +41,85 @@ timelineRouter.post('/events', async (req: Request, res: Response): Promise<void
 
   try {
     const result = await TimelineService.recordEvent(parseResult.data);
+    if (result.success) {
+      AuditLogger.info('TIMELINE', `${result.event.type} ${result.event.direction} event recorded`, {
+        parentType: result.parentType || 'none',
+        parentId: result.parentId || 'none',
+        channel: result.event.type,
+      });
+    } else {
+      AuditLogger.warn('TIMELINE', `${result.event.type} event recorded with warning`, {
+        error: result.error || 'unknown',
+      });
+    }
     res.status(result.success ? 201 : 207).json(result);
   } catch (err: any) {
     console.error('[Timeline Route Error]', err);
+    AuditLogger.error('TIMELINE', 'Timeline event recording failed unexpectedly', { error: err?.message || 'unknown' });
     res.status(500).json({ error: 'Failed to record timeline event' });
+  }
+});
+
+/**
+ * GET /api/v1/timeline/customer360/:parentType/:parentId
+ * Retrieve structured Customer 360 timeline data across all channels
+ */
+timelineRouter.get('/customer360/:parentType/:parentId', async (req: Request, res: Response): Promise<void> => {
+  const parentType = Array.isArray(req.params.parentType) ? req.params.parentType[0] : req.params.parentType;
+  const parentId = Array.isArray(req.params.parentId) ? req.params.parentId[0] : req.params.parentId;
+
+  if (!AllowedParentTypes.includes(parentType as any)) {
+    res.status(400).json({
+      error: `Invalid parentType. Must be one of: ${AllowedParentTypes.join(', ')}`,
+    });
+    return;
+  }
+
+  if (!parentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(parentId)) {
+    res.status(400).json({ error: 'Invalid parentId format' });
+    return;
+  }
+
+  try {
+    const data = await TimelineService.getCustomer360Timeline(
+      parentType as 'Contact' | 'Lead' | 'Account',
+      parentId
+    );
+    res.status(200).json(data);
+  } catch (err: any) {
+    console.error(`[Customer360 Error for ${parentType}/${parentId}]`, err);
+    res.status(502).json({ error: 'Failed to retrieve Customer 360 data' });
+  }
+});
+
+/**
+ * GET /api/v1/timeline/customer360/:parentType/:parentId/view
+ * Render interactive, responsive Customer 360 HTML visual timeline
+ */
+timelineRouter.get('/customer360/:parentType/:parentId/view', async (req: Request, res: Response): Promise<void> => {
+  const parentType = Array.isArray(req.params.parentType) ? req.params.parentType[0] : req.params.parentType;
+  const parentId = Array.isArray(req.params.parentId) ? req.params.parentId[0] : req.params.parentId;
+
+  if (!AllowedParentTypes.includes(parentType as any)) {
+    res.status(400).send('Invalid entity type');
+    return;
+  }
+
+  if (!parentId || !/^[a-zA-Z0-9_-]{1,64}$/.test(parentId)) {
+    res.status(400).send('Invalid ID format');
+    return;
+  }
+
+  try {
+    const data = await TimelineService.getCustomer360Timeline(
+      parentType as 'Contact' | 'Lead' | 'Account',
+      parentId
+    );
+    const html = TimelineService.renderCustomer360Html(data);
+    res.type('text/html').send(html);
+  } catch (err: any) {
+    console.error(`[Customer360 View Error for ${parentType}/${parentId}]`, err);
+    res.status(502).send('Error generating Customer 360 timeline view');
   }
 });
 

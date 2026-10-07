@@ -59,9 +59,57 @@ export async function findLeadByEmail(email: string) {
   return res.data;
 }
 
+export async function getContact(id: string) {
+  const res = await espocrm.get(`/Contact/${id}`);
+  return res.data;
+}
+
+export async function getLead(id: string) {
+  const res = await espocrm.get(`/Lead/${id}`);
+  return res.data;
+}
+
 export async function getEntityStream(parentType: string, parentId: string) {
   const res = await espocrm.get(`/${parentType}/${parentId}/stream`);
   return res.data;
+}
+
+export async function getEntityCalls(parentType: string, parentId: string) {
+  try {
+    const res = await espocrm.get('/Call', {
+      params: {
+        where: [
+          { type: 'equals', attribute: 'parentType', value: parentType },
+          { type: 'equals', attribute: 'parentId', value: parentId },
+        ],
+        orderBy: 'dateStart',
+        order: 'desc',
+        maxSize: 50,
+      },
+    });
+    return res.data?.list || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getEntityNotes(parentType: string, parentId: string) {
+  try {
+    const res = await espocrm.get('/Note', {
+      params: {
+        where: [
+          { type: 'equals', attribute: 'parentType', value: parentType },
+          { type: 'equals', attribute: 'parentId', value: parentId },
+        ],
+        orderBy: 'createdAt',
+        order: 'desc',
+        maxSize: 50,
+      },
+    });
+    return res.data?.list || [];
+  } catch {
+    return [];
+  }
 }
 
 // ─── Record Creation ──────────────────────────────────────────────────────────
