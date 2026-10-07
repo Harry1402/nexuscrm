@@ -1,54 +1,62 @@
-version: '3.8'
-
 services:
-  # EspoCRM Application Service
-  espocrm:
-    image: espocrm/espocrm:latest
-    container_name: nexuscrm_espocrm
-    restart: always
-    environment:
-      ESPOCRM_DATABASE_HOST: ${ESPOCRM_DATABASE_HOST:-db}
-      ESPOCRM_DATABASE_NAME: ${ESPOCRM_DATABASE_NAME:-espocrm}
-      ESPOCRM_DATABASE_USER: ${ESPOCRM_DATABASE_USER:-espocrm}
-      ESPOCRM_DATABASE_PASSWORD: ${ESPOCRM_DATABASE_PASSWORD:-espocrm_password}
-      ESPOCRM_ADMIN_USERNAME: ${ESPOCRM_ADMIN_USERNAME:-admin}
-      ESPOCRM_ADMIN_PASSWORD: ${ESPOCRM_ADMIN_PASSWORD:-admin}
-      ESPOCRM_SITE_URL: ${ESPOCRM_SITE_URL:-http://localhost:8080}
-    volumes:
-      - ./espocrm/custom:/var/www/html/custom
-    ports:
-      - "8080:80"
-    depends_on:
-      - db
 
-  # MySQL Database Service
   db:
     image: mysql:8.0
     container_name: nexuscrm_db
-    restart: always
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
-      MYSQL_DATABASE: ${ESPOCRM_DATABASE_NAME:-espocrm}
-      MYSQL_USER: ${ESPOCRM_DATABASE_USER:-espocrm}
-      MYSQL_PASSWORD: ${ESPOCRM_DATABASE_PASSWORD:-espocrm_password}
+      MYSQL_DATABASE: espocrm
+      MYSQL_USER: espocrm
+      MYSQL_PASSWORD: espocrm_password
+      MYSQL_ROOT_PASSWORD: root_password
     volumes:
       - mysql_data:/var/lib/mysql
-
-  # Integration API Service
-  integration-api:
-    build:
-      context: ./integration-api
-      dockerfile: Dockerfile
-    container_name: nexuscrm_integration_api
     restart: always
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  espocrm:
+    image: espocrm/espocrm:latest
+    container_name: nexuscrm_espocrm
     environment:
-      PORT: ${PORT:-3000}
-      ESPOCRM_API_URL: ${ESPOCRM_API_URL:-http://espocrm/api/v1}
-      ESPOCRM_API_KEY: ${ESPOCRM_API_KEY}
+      ESPOCRM_DATABASE_PLATFORM: Mysql
+      ESPOCRM_DATABASE_HOST: db
+      ESPOCRM_DATABASE_NAME: espocrm
+      ESPOCRM_DATABASE_USER: espocrm
+      ESPOCRM_DATABASE_PASSWORD: espocrm_password
+
+      ESPOCRM_ADMIN_USERNAME: admin
+      ESPOCRM_ADMIN_PASSWORD: admin
+
+      ESPOCRM_SITE_URL: "http://localhost:8080"
+
+    depends_on:
+      db:
+        condition: service_healthy
+
+    volumes:
+      - espocrm_data:/var/www/html
+
     ports:
-      - "3000:3000"
+      - "8080:80"
+
+    restart: always
+
+  espocrm-daemon:
+    image: espocrm/espocrm:latest
+    container_name: nexuscrm_daemon
+
+    volumes:
+      - espocrm_data:/var/www/html
+
     depends_on:
       - espocrm
 
+    restart: always
+    entrypoint: docker-daemon.sh
+
 volumes:
   mysql_data:
+  espocrm_data:
