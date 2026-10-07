@@ -1,28 +1,41 @@
 services:
 
-  db:
-    image: mysql:8.0
+  espocrm-db:
+    image: mariadb:latest
     container_name: nexuscrm_db
+    restart: unless-stopped
+
     environment:
-      MYSQL_DATABASE: espocrm
-      MYSQL_USER: espocrm
-      MYSQL_PASSWORD: espocrm_password
-      MYSQL_ROOT_PASSWORD: root_password
+      MARIADB_ROOT_PASSWORD: root_password
+      MARIADB_DATABASE: espocrm
+      MARIADB_USER: espocrm
+      MARIADB_PASSWORD: espocrm_password
+
     volumes:
-      - mysql_data:/var/lib/mysql
-    restart: always
+      - espocrm_db:/var/lib/mysql
+
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
+      test:
+        [
+          "CMD",
+          "healthcheck.sh",
+          "--connect",
+          "--innodb_initialized"
+        ]
+      interval: 20s
+      start_period: 10s
+      timeout: 10s
+      retries: 3
 
   espocrm:
     image: espocrm/espocrm:latest
     container_name: nexuscrm_espocrm
+    restart: unless-stopped
+
     environment:
       ESPOCRM_DATABASE_PLATFORM: Mysql
-      ESPOCRM_DATABASE_HOST: db
+      ESPOCRM_DATABASE_HOST: espocrm-db
+      ESPOCRM_DATABASE_PORT: 3306
       ESPOCRM_DATABASE_NAME: espocrm
       ESPOCRM_DATABASE_USER: espocrm
       ESPOCRM_DATABASE_PASSWORD: espocrm_password
@@ -33,30 +46,34 @@ services:
       ESPOCRM_SITE_URL: "http://localhost:8080"
 
     depends_on:
-      db:
+      espocrm-db:
         condition: service_healthy
 
     volumes:
-      - espocrm_data:/var/www/html
+      - espocrm_data:/var/www/html/data
+      - espocrm_custom:/var/www/html/custom
+      - espocrm_custom_client:/var/www/html/client/custom
 
     ports:
       - "8080:80"
 
-    restart: always
-
   espocrm-daemon:
     image: espocrm/espocrm:latest
     container_name: nexuscrm_daemon
+    restart: unless-stopped
 
     volumes:
-      - espocrm_data:/var/www/html
+      - espocrm_data:/var/www/html/data
+      - espocrm_custom:/var/www/html/custom
+      - espocrm_custom_client:/var/www/html/client/custom
 
     depends_on:
       - espocrm
 
-    restart: always
     entrypoint: docker-daemon.sh
 
 volumes:
-  mysql_data:
+  espocrm_db:
   espocrm_data:
+  espocrm_custom:
+  espocrm_custom_client:
