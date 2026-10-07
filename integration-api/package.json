@@ -1,0 +1,21 @@
+{
+  "name": "nexus-crm-integration-api",
+  "version": "1.0.0",
+  "description": "Integration API service for NexusCRM",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts"
+  },
+  "keywords": [
+    "crm",
+    "espocrm",
+    "integration",
+    "whatsapp",
+    "twilio",
+    "email"
+  ],
+  "author": "",
+  "license": "ISC"
+}
