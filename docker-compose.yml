@@ -72,8 +72,24 @@ services:
 
     entrypoint: docker-daemon.sh
 
+  minio:
+    image: cgr.dev/chainguard/minio:latest
+    container_name: nexuscrm_minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
 volumes:
   espocrm_db:
   espocrm_data:
   espocrm_custom:
   espocrm_custom_client:
+  minio_data:
+

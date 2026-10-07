@@ -148,6 +148,7 @@ Log in using the administrator credentials configured in your `.env` file.
 | **EspoCRM Web** | `nexuscrm_espocrm` | `8080:80` | Web UI and core REST API |
 | **MariaDB** | `nexuscrm_db` | Internal `3306` | Persistent relational database |
 | **Espo Daemon** | `nexuscrm_daemon` | N/A (Internal) | Background task scheduler and queue worker |
+| **MinIO Storage** | `nexuscrm_minio` | `9000:9000`, `9001:9001` | S3-compatible object storage & console |
 | **Integration API**| `nexus-crm-integration-api` | `3000:3000` | Omnichannel communication microservice |
 
 ---
